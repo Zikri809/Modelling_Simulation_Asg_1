@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aiman Programme Choice Model</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell" aria-live="polite">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">STTHK2133 Assignment 01</p>
+            <h1>Programme Choice Model</h1>
+          </div>
+          <div class="topbar-actions">
+            <span id="saveStatus" class="save-status">Saved on this device</span>
+            <button id="newSessionButton" class="ghost-button" type="button">Start new</button>
+          </div>
+        </header>
+
+        <section class="summary-band" aria-label="Prediction summary">
+          <div>
+            <p class="label">Most likely choice</p>
+            <h2 id="bestProgramme">-</h2>
+            <p id="bestChance" class="muted">Adjust the ratings to see the result.</p>
+          </div>
+          <div class="plain-note">
+            <strong>Score</strong> combines each rating with its priority.
+            <strong>Chance</strong> compares all scores and turns them into percentages.
+          </div>
+        </section>
+
+        <section class="main-grid">
+          <section class="editor" aria-label="Programme input editor">
+            <div class="section-heading">
+              <div>
+                <p class="label">Step 1</p>
+                <h2>Rate one programme</h2>
+              </div>
+              <select id="programmeSelect" aria-label="Programme to edit"></select>
+            </div>
+
+            <label class="name-field" for="programmeName">
+              Programme name
+              <input id="programmeName" type="text" maxlength="40">
+            </label>
+
+            <div id="ratingControls" class="rating-list"></div>
+          </section>
+
+          <section class="editor" aria-label="Priority editor">
+            <div class="section-heading">
+              <div>
+                <p class="label">Step 2</p>
+                <h2>Set priorities</h2>
+              </div>
+              <button id="resetWeightsButton" class="ghost-button small" type="button">Use assignment weights</button>
+            </div>
+
+            <p class="helper-text">
+              Higher priority means that factor has more influence on the final choice.
+            </p>
+            <div id="weightControls" class="priority-list"></div>
+          </section>
+
+          <section class="results-panel" aria-label="Model results">
+            <div class="section-heading">
+              <div>
+                <p class="label">Step 3</p>
+                <h2>Compare choices</h2>
+              </div>
+            </div>
+
+            <canvas id="probabilityChart" width="880" height="420" aria-label="Bar chart of choice chances"></canvas>
+            <div id="resultRows" class="result-rows"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <div id="setupOverlay" class="setup-overlay" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+      <section class="setup-box">
+        <p class="eyebrow">First start</p>
+        <h2 id="setupTitle">Choose your starting point</h2>
+        <p class="setup-copy">
+          Use Aiman's assignment table, or begin with neutral ratings and edit everything yourself.
+        </p>
+        <div class="setup-actions">
+          <button id="useAimanButton" class="primary-button" type="button">Use Aiman input</button>
+          <button id="useCustomButton" class="secondary-button" type="button">Start custom input</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
