@@ -71,6 +71,36 @@ function normalizePriorities(priorities) {
   return total > 0 ? cleaned.map((value) => value / total) : [...assignmentWeights];
 }
 
+function toPercentPriorities(priorities) {
+  const weights = normalizePriorities(priorities);
+  const percentages = weights.map((weight) => Math.round(weight * 100));
+  const difference = 100 - percentages.reduce((sum, value) => sum + value, 0);
+  percentages[percentages.length - 1] += difference;
+  return percentages;
+}
+
+function rebalancePriorities(changedIndex, newValue) {
+  const next = [...state.priorities];
+  const fixedValue = Math.max(0, Math.min(100, Number(newValue) || 0));
+  const remaining = 100 - fixedValue;
+  const otherIndexes = next.map((_, index) => index).filter((index) => index !== changedIndex);
+  const oldOtherTotal = otherIndexes.reduce((sum, index) => sum + next[index], 0);
+
+  next[changedIndex] = fixedValue;
+  if (otherIndexes.length > 0) {
+    otherIndexes.forEach((index) => {
+      next[index] = oldOtherTotal > 0
+        ? Math.round((next[index] / oldOtherTotal) * remaining)
+        : Math.floor(remaining / otherIndexes.length);
+    });
+
+    const total = next.reduce((sum, value) => sum + value, 0);
+    next[otherIndexes[otherIndexes.length - 1]] += 100 - total;
+  }
+
+  state.priorities = next;
+}
+
 function calculateResults() {
   //Gets the balanced priority weights
   const weights = normalizePriorities(state.priorities);
@@ -114,7 +144,7 @@ function loadSession() {
     state.selectedProgramme = saved.selectedProgramme || 0;
     //Uses saved data or Aiman's data if saved data is missing
     state.programmes = cloneProgrammes(saved.programmes || aimanProgrammes);
-    state.priorities = saved.priorities || (saved.weights || assignmentWeights).map((weight) => Math.round(weight * 100));
+    state.priorities = toPercentPriorities(saved.priorities || saved.weights || assignmentWeights);
     state.results = saved.results || null;
     return true;
   } catch {
@@ -205,17 +235,16 @@ function renderRatingControls() {
 
 function renderWeightControls() {
   elements.weightControls.innerHTML = "";
-  const weights = normalizePriorities(state.priorities);
   state.priorities.forEach((priority, index) => {
     const row = document.createElement("label");
     row.className = "control-row";
     row.innerHTML = `
       <span class="control-title">
         <strong>${factorInfo[index].label}</strong>
-        <span>${Math.round(weights[index] * 100)}% of final influence</span>
+        <span>${priority}% of the decision</span>
       </span>
-      <input type="range" min="0" max="100" step="5" value="${priority}" data-weight-index="${index}" aria-label="${factorInfo[index].label} priority">
-      <span class="value-pill">${priority}</span>
+      <input type="range" min="0" max="100" step="1" value="${priority}" data-weight-index="${index}" aria-label="${factorInfo[index].label} priority">
+      <span class="value-pill">${priority}%</span>
     `;
     elements.weightControls.append(row);
   });
@@ -329,7 +358,7 @@ elements.weightControls.addEventListener("input", (event) => {
   const input = event.target.closest("input[data-weight-index]");
   if (!input) return;
   const index = Number(input.dataset.weightIndex);
-  state.priorities[index] = Number(input.value);
+  rebalancePriorities(index, input.value);
   renderAll();
 });
 
