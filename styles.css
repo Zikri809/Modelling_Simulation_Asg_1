@@ -118,6 +118,11 @@ button {
   font-size: 13px;
 }
 
+.primary-button.small {
+  min-height: 34px;
+  font-size: 13px;
+}
+
 .primary-button {
   background: var(--accent);
   border-color: var(--accent);
@@ -215,6 +220,32 @@ select {
 .priority-list {
   display: grid;
   gap: 12px;
+}
+
+.weight-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.weight-total {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.weight-total.ready {
+  color: var(--green);
+}
+
+.weight-total.warning {
+  color: var(--orange);
 }
 
 .control-row {
@@ -354,6 +385,11 @@ input[type="range"] {
 
   .control-row {
     grid-template-columns: 1fr;
+  }
+
+  .weight-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .value-pill {

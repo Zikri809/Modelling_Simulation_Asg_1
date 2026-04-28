@@ -27,6 +27,7 @@ const state = {
   selectedProgramme: 0,
   programmes: [],
   priorities: assignmentWeights.map((weight) => Math.round(weight * 100)),
+  draftPriorities: assignmentWeights.map((weight) => Math.round(weight * 100)),
   results: null
 };
 
@@ -36,6 +37,8 @@ const elements = {
   useCustomButton: document.getElementById("useCustomButton"),
   newSessionButton: document.getElementById("newSessionButton"),
   resetWeightsButton: document.getElementById("resetWeightsButton"),
+  confirmWeightsButton: document.getElementById("confirmWeightsButton"),
+  weightTotalStatus: document.getElementById("weightTotalStatus"),
   saveStatus: document.getElementById("saveStatus"),
   bestProgramme: document.getElementById("bestProgramme"),
   bestChance: document.getElementById("bestChance"),
@@ -71,34 +74,12 @@ function normalizePriorities(priorities) {
   return total > 0 ? cleaned.map((value) => value / total) : [...assignmentWeights];
 }
 
-function toPercentPriorities(priorities) {
+function scalePrioritiesTo100(priorities) {
   const weights = normalizePriorities(priorities);
-  const percentages = weights.map((weight) => Math.round(weight * 100));
-  const difference = 100 - percentages.reduce((sum, value) => sum + value, 0);
-  percentages[percentages.length - 1] += difference;
-  return percentages;
-}
-
-function rebalancePriorities(changedIndex, newValue) {
-  const next = [...state.priorities];
-  const fixedValue = Math.max(0, Math.min(100, Number(newValue) || 0));
-  const remaining = 100 - fixedValue;
-  const otherIndexes = next.map((_, index) => index).filter((index) => index !== changedIndex);
-  const oldOtherTotal = otherIndexes.reduce((sum, index) => sum + next[index], 0);
-
-  next[changedIndex] = fixedValue;
-  if (otherIndexes.length > 0) {
-    otherIndexes.forEach((index) => {
-      next[index] = oldOtherTotal > 0
-        ? Math.round((next[index] / oldOtherTotal) * remaining)
-        : Math.floor(remaining / otherIndexes.length);
-    });
-
-    const total = next.reduce((sum, value) => sum + value, 0);
-    next[otherIndexes[otherIndexes.length - 1]] += 100 - total;
-  }
-
-  state.priorities = next;
+  const scaled = weights.map((weight) => Math.round(weight * 100));
+  const difference = 100 - scaled.reduce((sum, value) => sum + value, 0);
+  scaled[scaled.length - 1] += difference;
+  return scaled;
 }
 
 function calculateResults() {
@@ -128,6 +109,7 @@ function saveSession() {
     selectedProgramme: state.selectedProgramme,
     programmes: state.programmes,
     priorities: state.priorities,
+    draftPriorities: state.draftPriorities,
     results: state.results,
     savedAt: new Date().toISOString()
   }));
@@ -144,7 +126,8 @@ function loadSession() {
     state.selectedProgramme = saved.selectedProgramme || 0;
     //Uses saved data or Aiman's data if saved data is missing
     state.programmes = cloneProgrammes(saved.programmes || aimanProgrammes);
-    state.priorities = toPercentPriorities(saved.priorities || saved.weights || assignmentWeights);
+    state.priorities = (saved.priorities || (saved.weights || assignmentWeights).map((weight) => Math.round(weight * 100)));
+    state.draftPriorities = saved.draftPriorities || [...state.priorities];
     state.results = saved.results || null;
     return true;
   } catch {
@@ -158,6 +141,7 @@ function startWithAiman() {
   state.selectedProgramme = 0;
   state.programmes = cloneProgrammes(aimanProgrammes);
   state.priorities = assignmentWeights.map((weight) => Math.round(weight * 100));
+  state.draftPriorities = [...state.priorities];
   elements.setupOverlay.classList.remove("visible");
   renderAll();
 }
@@ -167,6 +151,7 @@ function startWithCustom() {
   state.selectedProgramme = 0;
   state.programmes = createCustomProgrammes();
   state.priorities = assignmentWeights.map((weight) => Math.round(weight * 100));
+  state.draftPriorities = [...state.priorities];
   elements.setupOverlay.classList.remove("visible");
   renderAll();
 }
@@ -181,6 +166,7 @@ function startNewSession() {
   state.selectedProgramme = 0;
   state.programmes = [];
   state.priorities = assignmentWeights.map((weight) => Math.round(weight * 100));
+  state.draftPriorities = [...state.priorities];
   state.results = null;
   showSetup();
 }
@@ -192,6 +178,7 @@ function clearScreenForSetup() {
   elements.programmeName.value = "";
   elements.ratingControls.innerHTML = "";
   elements.weightControls.innerHTML = "";
+  elements.weightTotalStatus.textContent = "Total: 0";
   elements.resultRows.innerHTML = "";
   elements.saveStatus.textContent = "No saved session";
 
@@ -235,19 +222,20 @@ function renderRatingControls() {
 
 function renderWeightControls() {
   elements.weightControls.innerHTML = "";
-  state.priorities.forEach((priority, index) => {
+  state.draftPriorities.forEach((priority, index) => {
     const row = document.createElement("label");
     row.className = "control-row";
     row.innerHTML = `
       <span class="control-title">
         <strong>${factorInfo[index].label}</strong>
-        <span>${priority}% of the decision</span>
+        <span>Current confirmed weight: ${state.priorities[index]}%</span>
       </span>
       <input type="range" min="0" max="100" step="1" value="${priority}" data-weight-index="${index}" aria-label="${factorInfo[index].label} priority">
-      <span class="value-pill">${priority}%</span>
+      <span class="value-pill">${priority}</span>
     `;
     elements.weightControls.append(row);
   });
+  updateWeightDraftDisplays();
 }
 
 function renderSummary(results) {
@@ -336,6 +324,70 @@ function renderAll() {
   saveSession();
 }
 
+function renderResultsOnly() {
+  state.results = calculateResults();
+  renderSummary(state.results);
+  renderRows(state.results);
+  renderChart(state.results);
+  saveSession();
+}
+
+function updateRatingDisplay(index, value) {
+  const input = elements.ratingControls.querySelector(`input[data-rating-index="${index}"]`);
+  if (!input) return;
+  input.value = value;
+  input.nextElementSibling.textContent = value;
+}
+
+function updateWeightDraftDisplays() {
+  const total = state.draftPriorities.reduce((sum, value) => sum + value, 0);
+
+  state.draftPriorities.forEach((priority, index) => {
+    const input = elements.weightControls.querySelector(`input[data-weight-index="${index}"]`);
+    if (!input) return;
+
+    const row = input.closest(".control-row");
+    const helper = row.querySelector(".control-title span");
+    const valuePill = input.nextElementSibling;
+
+    input.value = priority;
+    helper.textContent = `Current confirmed weight: ${state.priorities[index]}%`;
+    valuePill.textContent = priority;
+  });
+
+  elements.weightTotalStatus.classList.toggle("ready", total === 100);
+  elements.weightTotalStatus.classList.toggle("warning", total !== 100);
+  elements.weightTotalStatus.textContent = total === 100
+    ? "Total: 100. Ready to confirm."
+    : `Total: ${total}. It will need scaling before use.`;
+}
+
+function confirmWeights() {
+  const total = state.draftPriorities.reduce((sum, value) => sum + value, 0);
+
+  if (total === 100) {
+    state.priorities = [...state.draftPriorities];
+    renderWeightControls();
+    elements.weightTotalStatus.textContent = "Total: 100. These weights are now used in the result.";
+  } else {
+    const shouldScale = window.confirm(
+      `Your weight total is ${total}, not 100.\n\nChoose OK to scale them to 100 and calculate, or Cancel to keep editing.`
+    );
+
+    if (!shouldScale) {
+      elements.weightTotalStatus.textContent = `Total: ${total}. Edit the weights until you are ready.`;
+      return;
+    }
+
+    state.draftPriorities = scalePrioritiesTo100(state.draftPriorities);
+    state.priorities = [...state.draftPriorities];
+    renderWeightControls();
+    elements.weightTotalStatus.textContent = "Scaled to 100. These weights are now used in the result.";
+  }
+
+  renderResultsOnly();
+}
+
 elements.programmeSelect.addEventListener("change", (event) => {
   state.selectedProgramme = Number(event.target.value);
   renderAll();
@@ -343,7 +395,11 @@ elements.programmeSelect.addEventListener("change", (event) => {
 
 elements.programmeName.addEventListener("input", (event) => {
   state.programmes[state.selectedProgramme].name = event.target.value.trim() || `Programme ${state.selectedProgramme + 1}`;
-  renderAll();
+  const selectedOption = elements.programmeSelect.options[state.selectedProgramme];
+  if (selectedOption) {
+    selectedOption.textContent = state.programmes[state.selectedProgramme].name;
+  }
+  renderResultsOnly();
 });
 
 elements.ratingControls.addEventListener("input", (event) => {
@@ -351,22 +407,26 @@ elements.ratingControls.addEventListener("input", (event) => {
   if (!input) return;
   const index = Number(input.dataset.ratingIndex);
   state.programmes[state.selectedProgramme].ratings[index] = Number(input.value);
-  renderAll();
+  updateRatingDisplay(index, input.value);
+  renderResultsOnly();
 });
 
 elements.weightControls.addEventListener("input", (event) => {
   const input = event.target.closest("input[data-weight-index]");
   if (!input) return;
   const index = Number(input.dataset.weightIndex);
-  rebalancePriorities(index, input.value);
-  renderAll();
+  state.draftPriorities[index] = Number(input.value);
+  updateWeightDraftDisplays();
+  saveSession();
 });
 
 elements.resetWeightsButton.addEventListener("click", () => {
   state.priorities = assignmentWeights.map((weight) => Math.round(weight * 100));
+  state.draftPriorities = [...state.priorities];
   renderAll();
 });
 
+elements.confirmWeightsButton.addEventListener("click", confirmWeights);
 elements.useAimanButton.addEventListener("click", startWithAiman);
 elements.useCustomButton.addEventListener("click", startWithCustom);
 elements.newSessionButton.addEventListener("click", startNewSession);
